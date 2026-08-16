@@ -1,0 +1,6 @@
+# Python bytecode cache — regenerated whenever fetch_water.py imports fetch_data.py
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

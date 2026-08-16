@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Philadelphia Time Machine — 1600s to today in 3D</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- ── loading ───────────────────────────────────────────── -->
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-mark">PHILADELPHIA</div>
+    <div class="loader-sub">Time Machine</div>
+    <div class="loader-bar"><span id="loader-fill"></span></div>
+    <div class="loader-msg" id="loader-msg">Loading buildings…</div>
+  </div>
+</div>
+
+<!-- ── era caption (top left) ────────────────────────────── -->
+<div id="era-card" class="glass">
+  <div class="era-kicker" id="era-kicker">The Woods</div>
+  <h1 class="era-title" id="era-title">Coaquannock</h1>
+  <p class="era-body" id="era-body"></p>
+  <div class="era-source" id="era-source"></div>
+</div>
+
+<!-- ── stats (top right) ─────────────────────────────────── -->
+<div id="stats" class="glass">
+  <div class="stat">
+    <span class="stat-num" id="stat-buildings">0</span>
+    <span class="stat-lbl">buildings standing</span>
+  </div>
+  <div class="stat">
+    <span class="stat-num" id="stat-new">0</span>
+    <span class="stat-lbl">built this decade</span>
+  </div>
+  <div class="stat">
+    <span class="stat-num" id="stat-tall">—</span>
+    <span class="stat-lbl">tallest structure</span>
+  </div>
+</div>
+
+<!-- ── controls (right) ──────────────────────────────────── -->
+<div id="controls" class="glass">
+  <button class="ctl" id="btn-panels" title="Layer settings">Maps</button>
+  <button class="ctl" id="btn-3d" title="Toggle buildings">3D</button>
+  <button class="ctl" id="btn-terrain" title="Toggle terrain">Terr</button>
+  <button class="ctl" id="btn-spin" title="Orbit the city">Orbit</button>
+  <button class="ctl" id="btn-info" title="Data sources">?</button>
+</div>
+
+<!-- ── layer settings ────────────────────────────────────── -->
+<div id="panels" class="glass hidden">
+  <label class="pl">Historic map
+    <input type="range" id="opa-hist" min="0" max="100" value="85" />
+  </label>
+  <label class="pl">Building opacity
+    <input type="range" id="opa-bldg" min="20" max="100" value="92" />
+  </label>
+  <label class="pl">Colour buildings by
+    <select id="color-mode">
+      <option value="age">Year built</option>
+      <option value="height">Height</option>
+      <option value="plain">Single tone</option>
+    </select>
+  </label>
+</div>
+
+<!-- ── sources dialog ────────────────────────────────────── -->
+<div id="info" class="hidden">
+  <div class="info-box glass">
+    <button class="info-close" id="info-close">×</button>
+    <h2>What you are looking at</h2>
+    <p>Every basemap in this tool is a <strong>real, georeferenced historical map or aerial
+    photograph of Philadelphia</strong>. Nothing is illustrated or invented. The 3D massing is
+    built from the City of Philadelphia's own LiDAR-derived building footprints, dated by
+    the Office of Property Assessment's construction-year records.</p>
+
+    <h3>3D buildings</h3>
+    <ul>
+      <li><strong>Geometry &amp; height</strong> — City of Philadelphia
+        <em>LI_BUILDING_FOOTPRINTS</em>: 66,698 footprints in the historic core, with
+        LiDAR roof heights (<code>approx_hgt</code>) in feet above grade.</li>
+      <li><strong>Construction year</strong> — Office of Property Assessment
+        <em>opa_properties_public</em>. 94.0% of footprints are dated by a direct
+        street-address match, 3.9% by the median of their parcel's records, and
+        2.1% estimated from neighbouring buildings.</li>
+    </ul>
+
+    <h3>Historic basemaps, in order</h3>
+    <div id="src-list"></div>
+
+    <h3 class="warn-h">Honest caveats</h3>
+    <ul class="warn">
+      <li><strong>Pre-1682 is a reconstruction.</strong> No survey map of the site exists
+        before Thomas Holme's. That era shows real terrain and real river geometry with a
+        woodland treatment — it is an impression, not a document.</li>
+      <li><strong>Assessor rounding.</strong> OPA construction years cluster heavily on
+        1920 and 1925 for older rowhouses, because that was the assessor's default for
+        "old". The 1910s–20s therefore look like a sharper building boom than it was.
+        It remains the only citywide dated dataset that exists.</li>
+      <li><strong>Survivor bias.</strong> These are buildings <em>standing today</em>, dated
+        by when they were built. Demolished buildings are not in the dataset, so earlier
+        years show a thinner city than really stood there. The historic basemaps underneath
+        show what has been lost.</li>
+      <li><strong>Big buildings are dated worst.</strong> OPA is reliable for the row-house
+        fabric — the overwhelming majority of these footprints — but for large commercial
+        buildings <code>year_built</code> often records a renovation, a company's founding
+        year, or simply the oldest record on a shared lot. City Hall is listed as
+        <strong>2015</strong>. A 173 m tower at 1911 Walnut carries an 1800 record.</li>
+      <li><strong>Two impossible-date checks are applied.</strong> Nothing in Philadelphia
+        stood above about 40 m before the steel-frame 1890s, and by long convention nothing
+        exceeded City Hall's 167 m until One Liberty Place broke it in 1987. Eight
+        footprints violate one of those and have their date discarded and re-estimated.
+        "Tallest structure" only ever counts buildings dated directly from a record.</li>
+      <li><strong>Heights are roofs, not spires.</strong> <code>approx_hgt</code> is used
+        rather than the raw LiDAR maximum, which borrows height from whatever overhangs a
+        footprint — it reads the Shops at Liberty Place as 700 ft instead of 56 ft. The
+        trade is that spires are cut: Comcast Center measures 297 m here, correct to its
+        roof, while the Technology Center's mast is not counted.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── timeline ──────────────────────────────────────────── -->
+<div id="timeline" class="glass">
+  <button id="play" aria-label="Play"><svg viewBox="0 0 24 24" id="play-icon"><path d="M8 5v14l11-7z"/></svg></button>
+
+  <div class="year-wrap">
+    <div class="year" id="year">1682</div>
+    <div class="year-sub" id="year-sub">Holme's plan</div>
+  </div>
+
+  <div class="track-wrap">
+    <div class="ticks" id="ticks"></div>
+    <input type="range" id="slider" min="1650" max="2026" value="1682" step="1" />
+    <div class="track-labels">
+      <span>1650</span><span>1750</span><span>1850</span><span>1950</span><span>2026</span>
+    </div>
+  </div>
+
+  <div class="speed">
+    <label for="speed-sel">Speed</label>
+    <select id="speed-sel">
+      <option value="6">Slow</option>
+      <option value="14" selected>Normal</option>
+      <option value="34">Fast</option>
+    </select>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
